@@ -5,9 +5,12 @@ One shared prompt per day. Two one‑sentence answers revealed only after both s
 ## Setup
 1. Create a Supabase project.
 2. Enable **Email** provider in Auth (magic link).
-3. Create the tables + RLS policies below.
-4. Copy `.env.example` → `.env.local` and fill in values.
-5. Run locally: `npm install` then `npm run dev`.
+3. In Auth settings, add redirect URLs:
+   - `http://localhost:3000/today`
+   - `https://your-vercel-domain.vercel.app/today`
+4. Create the tables + RLS policies below.
+5. Copy `.env.example` → `.env.local` and fill in values.
+6. Run locally: `npm install` then `npm run dev`.
 
 ## Supabase SQL
 Run these in the SQL editor:
