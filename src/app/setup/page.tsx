@@ -57,6 +57,7 @@ export default function SetupPage() {
     if (!session?.user) return;
     setLoading(true);
     setStatus(null);
+    let lastError: string | null = null;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const code = generateJoinCode();
@@ -75,9 +76,12 @@ export default function SetupPage() {
         router.push("/today");
         return;
       }
+      if (error) {
+        lastError = error.message;
+      }
     }
 
-    setStatus("Could not create a pair. Try again.");
+    setStatus(lastError ?? "Could not create a pair. Try again.");
     setLoading(false);
   };
 
@@ -97,7 +101,7 @@ export default function SetupPage() {
       .single<Pair>();
 
     if (error || !pair) {
-      setStatus("Join code not found.");
+      setStatus(error?.message ?? "Join code not found.");
       setLoading(false);
       return;
     }
