@@ -17,6 +17,9 @@ export default function SetupPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -51,6 +54,54 @@ export default function SetupPage() {
       return;
     }
     setAuthMessage("Magic link sent! Check your email.");
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthMessage(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/today`,
+      },
+    });
+    if (error) {
+      setAuthMessage(error.message);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    setAuthMessage(null);
+    if (!phone.trim()) {
+      setAuthMessage("Add a phone number first.");
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+    });
+    if (error) {
+      setAuthMessage(error.message);
+      return;
+    }
+    setOtpSent(true);
+    setAuthMessage("Code sent! Check your phone.");
+  };
+
+  const handleVerifyOtp = async () => {
+    setAuthMessage(null);
+    if (!otp.trim()) {
+      setAuthMessage("Enter the code.");
+      return;
+    }
+    const { error } = await supabase.auth.verifyOtp({
+      phone,
+      token: otp,
+      type: "sms",
+    });
+    if (error) {
+      setAuthMessage(error.message);
+      return;
+    }
+    setAuthMessage("Signed in!");
   };
 
   const handleCreatePair = async () => {
@@ -150,8 +201,69 @@ export default function SetupPage() {
           <section className="glass rounded-3xl p-6 sm:p-8">
             <h2 className="font-display text-2xl">Sign in</h2>
             <p className="mt-2 text-sm text-[color:var(--ink-700)]">
-              Use a magic link to sign in fast.
+              Pick whatever is easiest: Google, phone, or email magic link.
             </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="flex-1 rounded-2xl bg-[color:var(--ink-900)] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+              >
+                Continue with Google
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp("");
+                  setAuthMessage(null);
+                }}
+                className="rounded-2xl border border-white/70 bg-white/70 px-5 py-3 text-sm font-semibold text-[color:var(--ink-700)] transition hover:-translate-y-0.5"
+              >
+                Use phone
+              </button>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-white/70 bg-white/70 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--ink-700)]">
+                Phone number
+              </p>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  type="tel"
+                  placeholder="+1 555 123 4567"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  className="w-full flex-1 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  className="rounded-2xl bg-[color:var(--rose-500)] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+                >
+                  Send code
+                </button>
+              </div>
+              {otpSent && (
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <input
+                    type="text"
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(event) => setOtp(event.target.value)}
+                    className="w-full flex-1 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    className="rounded-2xl bg-[color:var(--ink-900)] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+                  >
+                    Verify code
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center">
               <input
                 type="email"
