@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Daily Prompt (Couples)
 
-## Getting Started
+One shared prompt per day. Two one‑sentence answers revealed only after both submit.
 
-First, run the development server:
+## Setup
+1. Create a Supabase project.
+2. Enable **Email** provider in Auth (magic link).
+3. Create the tables + RLS policies below.
+4. Copy `.env.example` → `.env.local` and fill in values.
+5. Run locally: `npm install` then `npm run dev`.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Supabase SQL
+Run these in the SQL editor:
+
+```sql
+-- tables
+create table if not exists public.pairs (
+  id uuid primary key default gen_random_uuid(),
+  join_code text unique,
+  user_a uuid not null,
+  user_b uuid,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists public.daily_prompt (
+  id uuid primary key default gen_random_uuid(),
+  pair_id uuid references public.pairs(id) on delete cascade,
+  date text not null,
+  tone text not null,
+  less_therapy boolean not null default false,
+  prompt text not null,
+  created_at timestamp with time zone default now(),
+  unique (pair_id, date)
+);
+
+create table if not exists public.responses (
+  id uuid primary key default gen_random_uuid(),
+  pair_id uuid references public.pairs(id) on delete cascade,
+  date text not null,
+  user_id uuid not null,
+  answer text not null,
+  created_at timestamp with time zone default now(),
+  unique (pair_id, date, user_id)
+);
+
+-- RLS
+alter table public.pairs enable row level security;
+alter table public.daily_prompt enable row level security;
+alter table public.responses enable row level security;
+
+create policy "Pairs are visible to members"
+  on public.pairs for select
+  using (auth.uid() = user_a or auth.uid() = user_b);
+
+create policy "Pairs insert by auth user"
+  on public.pairs for insert
+  with check (auth.uid() = user_a);
+
+create policy "Pairs update by members"
+  on public.pairs for update
+  using (auth.uid() = user_a or auth.uid() = user_b);
+
+create policy "Daily prompt visible to members"
+  on public.daily_prompt for select
+  using (
+    exists (
+      select 1 from public.pairs
+      where pairs.id = daily_prompt.pair_id
+        and (pairs.user_a = auth.uid() or pairs.user_b = auth.uid())
+    )
+  );
+
+create policy "Daily prompt insert by members"
+  on public.daily_prompt for insert
+  with check (
+    exists (
+      select 1 from public.pairs
+      where pairs.id = daily_prompt.pair_id
+        and (pairs.user_a = auth.uid() or pairs.user_b = auth.uid())
+    )
+  );
+
+create policy "Responses visible to members"
+  on public.responses for select
+  using (
+    exists (
+      select 1 from public.pairs
+      where pairs.id = responses.pair_id
+        and (pairs.user_a = auth.uid() or pairs.user_b = auth.uid())
+    )
+  );
+
+create policy "Responses insert by members"
+  on public.responses for insert
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.pairs
+      where pairs.id = responses.pair_id
+        and (pairs.user_a = auth.uid() or pairs.user_b = auth.uid())
+    )
+  );
+
+create policy "Responses update by owner"
+  on public.responses for update
+  using (auth.uid() = user_id);
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Environment variables (Vercel)
+Set these for Production + Preview:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `GEMINI_API_KEY`
